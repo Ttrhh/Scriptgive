@@ -1,60 +1,78 @@
--- Variables
+
+-- Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local mouse = LocalPlayer:GetMouse()
+local UserInputService = game:GetService("UserInputService")
+
+-- Variables
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+local camera = workspace.CurrentCamera
+
 local flying = false
 local speed = 50
-local bodyGyro, bodyVelocity
 
--- Fonction pour activer le vol
-function startFly()
-    local char = LocalPlayer.Character
-    local hrp = char:WaitForChild("HumanoidRootPart")
+-- GUI Creation
+local screenGui = Instance.new("ScreenGui")
+local frame = Instance.new("Frame")
+local button = Instance.new("TextButton")
 
-    bodyGyro = Instance.new("BodyGyro", hrp)
-    bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
-    bodyGyro.P = 3000
-    bodyGyro.CFrame = hrp.CFrame
+screenGui.Parent = player.PlayerGui
 
-    bodyVelocity = Instance.new("BodyVelocity", hrp)
-    bodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
+frame.Size = UDim2.new(0, 150, 0, 70)
+frame.Position = UDim2.new(0.8, 0, 0.1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+frame.BorderSizePixel = 2
+frame.Parent = screenGui
+
+button.Size = UDim2.new(0.8, 0, 0.6, 0)
+button.Position = UDim2.new(0.1, 0, 0.2, 0)
+button.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "Enable Fly"
+button.Parent = frame
+
+-- Flying Functions
+local function startFlying()
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-
+    bodyVelocity.Parent = root
+    
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 9000
+    bodyGyro.Parent = root
+    
+    -- Flying Loop
     game:GetService("RunService").RenderStepped:Connect(function()
-        if flying then
-            local cf = workspace.CurrentCamera.CFrame
-            local direction = Vector3.new(0, 0, 0)
-
-            if mouse.W then direction += cf.LookVector end
-            if mouse.S then direction -= cf.LookVector end
-            if mouse.A then direction -= cf.RightVector end
-            if mouse.D then direction += cf.RightVector end
-
-            bodyVelocity.Velocity = direction.Unit * speed + Vector3.new(0, 20, 0)
-            bodyGyro.CFrame = workspace.CurrentCamera.CFrame
-        end
+        if not flying then return end
+        
+        local moveDirection = Vector3.new(
+            UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0,
+            UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0,
+            UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or UserInputService:IsKeyDown(Enum.KeyCode.W) and -1 or 0
+        )
+        
+        bodyVelocity.Velocity = camera.CFrame:VectorToWorldSpace(moveDirection * speed)
+        bodyGyro.CFrame = CFrame.new(root.Position, root.Position + camera.CFrame.LookVector)
     end)
 end
 
--- Fonction pour désactiver le vol
-function stopFly()
-    if bodyGyro then
-        bodyGyro:Destroy()
-    end
-    if bodyVelocity then
-        bodyVelocity:Destroy()
-    end
-end
-
--- Toggle Fly
-local function toggleFly()
+-- Button Click Handler
+button.MouseButton1Click:Connect(function()
     flying = not flying
+    button.Text = flying and "Disable Fly" or "Enable Fly"
+    button.BackgroundColor3 = flying and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(65, 65, 65)
+    
     if flying then
-        startFly()
+        startFlying()
     else
-        stopFly()
+        for _, v in pairs(root:GetChildren()) do
+            if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then
+                v:Destroy()
+            end
+        end
     end
-end
-
--- Appel Toggle Fly
-toggleFly()
+end)
